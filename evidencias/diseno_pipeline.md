@@ -283,8 +283,6 @@ odoo=# SELECT COUNT(*) FROM staging.sales_clean;
 -------
      0
 (1 row)
-
-odoo=#
 ```
 - Configuración conexión
 ```
@@ -312,3 +310,4 @@ WHERE
     so.state IN ('sale', 'done')
 ORDER BY so.date_order ASC;
 
+```
