@@ -202,3 +202,115 @@ id|order_id|product_id|name|product_uom_qty|price_unit|price_subtotal
 41|19|6|[FURN_8888] Lámpara de oficina|5.00|145.00|725.00
 ```
 
+ ### Conectado al psql del contenedor:
+
+ - Conectado al psql del contenedor:
+  ```
+  CREATE SCHEMA IF NOT EXISTS staging;
+
+CREATE TABLE IF NOT EXISTS staging.sales_clean (
+    id                  SERIAL PRIMARY KEY,
+    sale_order_id       INTEGER,
+    order_name          VARCHAR(100),
+    partner_name        VARCHAR(255),
+    partner_email       VARCHAR(255),
+    product_name        VARCHAR(255),
+    product_code        VARCHAR(100),
+    qty_ordered         NUMERIC(16,4)  DEFAULT 0,
+    unit_price          NUMERIC(16,4)  DEFAULT 0,
+    price_subtotal      NUMERIC(16,4)  DEFAULT 0,
+    order_date          DATE,
+    order_state         VARCHAR(50),
+    currency_name       VARCHAR(10),
+    etl_load_date       TIMESTAMP      DEFAULT NOW(),
+    etl_source          VARCHAR(100)   DEFAULT 'hop_pipeline_v1'
+);
+
+  ```
+- Verificar creación
+```
+\dt staging.*
+\d staging.sales_clean
+```
+```
+odoo=# \dt staging.*
+           List of relations
+ Schema  |    Name     | Type  | Owner
+---------+-------------+-------+-------
+ staging | sales_clean | table | user
+(1 row)
+
+odoo=# \d staging.sales_clean
+                                              Table "staging.sales_clean"
+     Column     |            Type             | Collation | Nullable |                     Default
+----------------+-----------------------------+-----------+----------+-------------------------------------------------
+ id             | integer                     |           | not null | nextval('staging.sales_clean_id_seq'::regclass)
+ sale_order_id  | integer                     |           |          |
+ order_name     | character varying(100)      |           |          |
+ partner_name   | character varying(255)      |           |          |
+ partner_email  | character varying(255)      |           |          |
+ product_name   | character varying(255)      |           |          |
+ product_code   | character varying(100)      |           |          |
+ qty_ordered    | numeric(16,4)               |           |          | 0
+ unit_price     | numeric(16,4)               |           |          | 0
+ price_subtotal | numeric(16,4)               |           |          | 0
+ order_date     | date                        |           |          |
+ order_state    | character varying(50)       |           |          |
+ currency_name  | character varying(10)       |           |          |
+ etl_load_date  | timestamp without time zone |           |          | now()
+ etl_source     | character varying(100)      |           |          | 'hop_pipeline_v1'::character varying
+Indexes:
+    "sales_clean_pkey" PRIMARY KEY, btree (id)
+```
+- Dar permisos
+```
+GRANT ALL PRIVILEGES ON SCHEMA staging TO "user";
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA staging TO "user";
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA staging TO "user";
+```
+```
+GRANT ALL PRIVILEGES ON SCHEMA staging TO "user";
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA staging TO "user";
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA staging TO "user";
+```
+- Verificar
+```
+SELECT COUNT(*) FROM staging.sales_clean;
+```
+```
+odoo=# SELECT COUNT(*) FROM staging.sales_clean;
+ count 
+-------
+     0
+(1 row)
+
+odoo=#
+```
+- Configuración conexión
+- ```
+SELECT
+    so.id                        AS sale_order_id,
+    so.name                      AS order_name,
+    rp.name                      AS partner_name,
+    rp.email                     AS partner_email,
+    pt.name                      AS product_name,
+    pt.default_code              AS product_code,
+    sol.product_uom_qty          AS qty_ordered,
+    sol.price_unit               AS unit_price,
+    sol.price_subtotal           AS price_subtotal,
+    so.date_order                AS order_date,
+    so.state                     AS order_state,
+    rc.name                      AS currency_name
+FROM
+    sale_order so
+    JOIN sale_order_line sol  ON sol.order_id = so.id
+    JOIN res_partner rp       ON rp.id = so.partner_id
+    JOIN product_product pp   ON pp.id = sol.product_id
+    JOIN product_template pt  ON pt.id = pp.product_tmpl_id
+    JOIN res_currency rc      ON rc.id = so.currency_id
+WHERE
+    so.state IN ('sale', 'done')
+ORDER BY so.date_order ASC;
+```
+```
+
